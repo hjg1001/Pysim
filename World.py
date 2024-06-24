@@ -1,43 +1,32 @@
-import random,Tile,pygame,Setting,Organ
-Terrain_type_list=[
-'草地',
-'平原',
-'森林',
-#'沙漠',
-#'雪地',
-#'雪林'
-]
-World_size=[1,2]
-Tem=[30,-5]#最高温,最低温
-Tem.append((Tem[0]-Tem[1])/(World_size[1]//2))#变化值
+import random,Tile,pygame,Setting,Img,Structure,Organ,Agent
+import numpy as np
 class World:
 	def __init__(self):
-		self.tile_list=[]
 		self.O_list=[]
-		self.surface=pygame.Surface((World_size[0]*200,World_size[1]*200))
-		for x in range(World_size[0]):
-			tem=Tem[1]
-			self.tile_list.append([])
-			if random.random()>0.65:No_desert=True
-			else:No_desert=False
-			for y in range(World_size[1]):
-				if tem<=1:
-						Type=random.choice(['雪地','雪林'])
-				elif (not No_desert or tem>Tem[0]*0.9) and (tem>Tem[0]*0.8 or (tem>Tem[0]*0.65 and random.random()>0.8)):
-					 Type='沙漠'
-				else:
-					Type=random.choice(Terrain_type_list)
-				self.tile_list[x].append(Tile.Map_Tile(x,y,Type,int(tem)))
-				self.surface.blit(pygame.transform.scale(self.tile_list[x][y].surface,(200,200)),(x*200,y*200))
-				if Setting.Draw_Map_Edges:pygame.draw.rect(self.surface,(0,0,0),(x*200,y*200,200,200),2)
-				if y<World_size[1]//2:#上半部分
-					tem+=Tem[2]*1.1
-				else:
-					tem-=Tem[2]
-		for i in self.tile_list:
-			for t in i:
-				if t.agent_list:
-					o=Organ.Organization(t.agent_list[0],t.agent_list)
-					self.O_list.append(o)
-					t.agent_list[0].Organ=o
-					t.agent_list[0].Job='leader'
+		self.agent_list=[]
+		self.farm_list=[]
+		self.house_list=[]
+#-----生成地图
+		self.surface=pygame.Surface((Setting.World_size[0]*32,Setting.World_size[1]*32))
+		self.surface.fill((0,140,0))
+		generate  =  np.vectorize(self.generate)
+		self.World_map=generate(np.arange(Setting.World_size[0]),  np.arange(Setting.World_size[1]).reshape(-1,  1)).tolist()
+		if Setting.Draw_Tile_Edges:
+			for x in range(0,Setting.World_size[0]):pygame.draw.line(self.surface,(0,0,0),(x*32,0),(x*32,Setting.World_size[0]*32))
+			for y in range(0,Setting.World_size[1]):pygame.draw.line(self.surface,(0,0,0),(0,y*32),(Setting.World_size[1]*32,y*32))
+		if Setting.Save_map_img:pygame.image.save(self.surface,'W.png')
+		self.O_list.append(Organ.Organization(Agent.Agent(0,0,self,None,'leader')))#生成组织
+		self.O_list[0].leader.Organ=self.O_list[0]
+		while len(self.agent_list)<Setting.Agent_num:
+			#生成智能体
+			r_x,r_y=random.randint(10,25)+self.agent_list[0].x,random.randint(10,15)+self.agent_list[0].y
+			T=self.World_map[r_x if Setting.World_size[0]>r_x>0 else 0][r_y if Setting.World_size[1]>r_y>0 else 0]
+			if T.passability is not None and not T.Structure and not T.Unit:
+				Agent.Agent(T.x,T.y,self,self.O_list[0])
+	def generate(self,y,x):
+			T=Tile.Tile(x,y,'grass',0)
+			if random.random()>0.9:
+				T.Structure=Structure.Tree(x,y)
+				T.passability=None
+				self.surface.blit(Img.images['tree'],(x*32,y*32))
+			return T

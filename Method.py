@@ -35,9 +35,6 @@ def generate_noise(shape, res, tileable=(False, False)):
     arr = np.sqrt(2) * ((1 - t[:, :, 1]) * n0 + t[:, :, 1] * n1)
     return [[fn(j) for j in i] for i in arr]
 
-
-
-
 #GPT4写的
 def is_within_bounds(x, y, grid):
     return 0 <= x < len(grid) and 0 <= y < len(grid[0])
@@ -100,7 +97,7 @@ def dfs(start, end, grid):
             for direction in directions:
                 neighbor = (current[0] + direction[0], current[1] + direction[1])
                 if is_within_bounds(neighbor[0], neighbor[1], grid) and neighbor not in visited:
-                    if grid[neighbor[0]][neighbor[1]].Pass is not None:
+                    if grid[neighbor[0]][neighbor[1]].passability is not None:
                         stack.append(neighbor)
                         parent[neighbor] = current
     
