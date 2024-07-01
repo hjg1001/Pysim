@@ -1,7 +1,12 @@
+#---程序设置
 screen_size=(720,1600)
-Draw_Tile_Edges=True#绘制地块边框
 FPS=60
-World_size=[50,50]
+Draw_Tile_Edges=True#绘制地块边框
 Save_map_img=True
-Agent_num=5
-food=0
+#---世界设置
+World_size=[50,50]#长宽一致
+AgentNum=2#智能体总数
+AgentDensity=0.02#智能体密度
+TreeProportion=0.1#树木占比
+Seed=1145191#世界种子
+NoiseScale=50#缩放越大生成越平滑

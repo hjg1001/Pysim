@@ -29,12 +29,14 @@ def Run():
 		Key.key_act(U)
 		#更新世界
 		screen.blit(W.surface,(U.vx,U.vy))
-		for farm in W.farm_list:
-			farm.update(screen,U,Font2)
-		for house in W.house_list:
-			house.update(screen,U,Font2)
-		for agent in W.agent_list:
+		W.time_run()
+		for L in W.Building_list.values():
+			for building in L:
+				building.update(screen,U)
+		for agent in W.Agent_list:
 			agent.update(screen,U,Font2,W)
+		for city in W.City_list:
+			city.update(screen,U,Font3,W)
 		#工具UI
 		if U.tool_menu:menu.enable()
 		else:menu.disable()
@@ -43,7 +45,8 @@ def Run():
 			menu.draw(screen)
 		screen.blit(Img.images['tool'],(30,10))
 		#Debug
-		screen.blit(Font.render(f'FPS:{fps}{W.house_list}',True,(255,5,9),(0,0,0)),(0,60))
+		screen.blit(Font.render(f'FPS:{fps}',True,(255,5,9),(0,0,0)),(0,60))
+		screen.blit(Font.render(f'{W.Time[3]}年{W.Time[2]}月{W.Time[1]}天',True,(55,196,252),(255,255,255)),(0,100))
 		pygame.display.update()
 def pause(u):
 	u.pause=not u.pause
@@ -58,6 +61,7 @@ if __name__=='__main__':
 	W=World.World()
 	U=UI()
 	Font=pygame.font.Font('NotoSerifCJK-Regular.ttc',30)
-	Font2=pygame.font.Font('NotoSerifCJK-Regular.ttc',18)
+	Font2=pygame.font.Font('NotoSerifCJK-Regular.ttc',10)
+	Font3=pygame.font.Font('NotoSerifCJK-Regular.ttc',20)
 	print('此次初始化用时',time.time()-t0)
 	Run()
