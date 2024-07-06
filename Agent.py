@@ -44,7 +44,11 @@ class Agent:
 					for action in self.City.ActionList:
 						if self.City.ActionList[action][1]>self.City.ActionList[action][0]:
 							self.city_action=action
+							self.City.ActionList[action][0]+=1
 							break
+				elif not self.city_action and not self.action and not self.state and self.City and random.randint(0,10000)>9990:
+					T=random.choice(self.City.CityTile)
+					self.move(T.x,T.y,W.World_map)#否则闲逛
 			#更新行为至城市
 			if self.City and self.action and self.City.ActionState==0:
 				if self.city_action in self.City.ActionList.keys():
@@ -57,13 +61,23 @@ class Agent:
 					self.tile.City.AgentList.append(self)
 					self.action=None
 					self.City=self.tile.City
-			elif self.city_action=='farm':#细分种田
+			elif self.city_action=='farm' and not self.action:#细分种田
 				for farm in self.City.FarmList:
-					if not self.City.FarmList[farm][3] or not self.City.FarmList[farm][3].action==self.action:
-						self.work_building=farm
-						self.action=self.City.FarmList[farm][0]
-						self.move(self.City.FarmList[farm][1],self.City.FarmList[farm][2],W.World_map)
-						self.City.FarmList[farm][3]=self
+					if not self.City.FarmList[farm][3] or((self.City.FarmList[farm][3].x,self.City.FarmList[farm][3].y)!=(self.City.FarmList[farm][1],self.City.FarmList[farm][2])):
+						if not self.City.FarmList[farm][3] or not self.City.FarmList[farm][3].road or (self.City.FarmList[farm][3].road[len(self.City.FarmList[farm][3].road)-1][0],self.City.FarmList[farm][3].road[len(self.City.FarmList[farm][3].road)-1][1])!=(self.City.FarmList[farm][1],self.City.FarmList[farm][2]):
+							self.work_building=farm
+							self.move(self.City.FarmList[farm][1],self.City.FarmList[farm][2],W.World_map)
+							self.action=self.City.FarmList[farm][0]
+							self.City.FarmList[farm][3]=self
+							break
+				if not self.action:self.city_action=None
+			elif self.city_action=='pick' and not self.action:#采集
+				T=random.choice(self.City.CityTile)
+				if type(T.Structure).__name__=='Bush':
+					self.move(T.x,T.y,W.World_map)
+					if self.state=='move':
+						self.action='pick_bush'
+				if not self.action:self.city_action=None
 			#细化行为下的状态
 			if self.state=='move':pass
 			elif self.action=='set_farm':#建新田
@@ -71,7 +85,7 @@ class Agent:
 				W.Building_list['farm'].append(self.work_building)
 				self.City.BuildingList['farm'][0].append(self.work_building)
 				self.action=None
-				if self.work_building in self.City.FarmList:self.City.FarmList.pop(self.work_building)
+				if self.work_building in list(self.City.FarmList.keys()):self.City.FarmList.pop(self.work_building)
 				self.work_building=None
 				self.city_action=None
 			elif self.action=='continue_farm':#耕田
@@ -79,7 +93,26 @@ class Agent:
 				if self.work_building.build_progress[0]>self.work_building.build_progress[1]:
 					self.action=None
 					self.city_action=None
-					if self.work_building in self.City.FarmList:self.City.FarmList.pop(self.work_building)
+					if self.work_building in list(self.City.FarmList.keys()):self.City.FarmList.pop(self.work_building)
+			elif self.action=='pick_bush':
+				W.World_map[self.x][self.y].Structure.food-=1
+				self.City.Resource['food']+=1
+				if W.World_map[self.x][self.y].Structure.food<0:
+					self.city_action=None
+					self.action=None
+					W.World_map[self.x][self.y].Structure=None
+					pygame.draw.rect(W.surface,(0,140,0),(self.x*32+1,self.y*32+1,31,31))
+			#更新自然状态
+			if self.satiety>0:self.satiety-=0.06
+			else:self.hp-=0.08
+			if self.satiety<40 and self.City:
+				if self.City.Resource['food']<40:
+					self.satiety+=self.City.Resource['food']
+					self.City.Resource['food']=0
+				else:
+					self.City.Resource['food']-=40
+					self.satiety+=40
+			if self.hp<0:self.die(W)
 		#绘制
 		self.draw_agent(screen,U,font)
 		if self.road:self.draw_road(screen,U)
@@ -95,6 +128,12 @@ class Agent:
 				if getattr(W.World_map[nx][ny],info)==need_info:
 					TileNum[0]+=1
 		return TileNum[1]<=TileNum[0]
+	#--死亡
+	def die(self,W):
+		if self.City:self.City.AgentList.remove(self)
+		W.World_map[self.x][self.y].Unit=None
+		W.Agent_list.remove(self)
+		del self
 	#--建立组织
 	def set_nation(self,W):
 		Nation=Organ.Nation(W.Time)
@@ -102,15 +141,15 @@ class Agent:
 		self.set_city(W,Nation)
 	def set_city(self,W,Nation):
 		City=Organ.City(W.Time,Nation,self.x,self.y)
-		CityTileSurface=pygame.Surface((32,32),pygame.SRCALPHA,depth=32)
+		CityTileSurface=pygame.Surface((32,32))
 		CityTileSurface.fill(Nation.Color)
-		CityTileSurface.set_alpha(150)
 		radius=4
 		for nx in range(max(0,self.x-radius),min(Setting.World_size[0]-1,self.x+radius)+1):
 			for ny in range(max(0,self.y-radius),min(Setting.World_size[1]-1,self.y+radius)+1):
 				setattr(W.World_map[nx][ny],'City',City)
-				W.surface.blit(CityTileSurface,(nx*32,ny*32))
+				W.effect_surface.blit(CityTileSurface,(nx*32,ny*32))
 				City.CityTile.append(W.World_map[nx][ny])
+				City.VisitQueue.append(W.World_map[nx][ny])
 		W.City_list.append(City)
 		Nation.City_list.append(City)
 	#--绘制
@@ -120,15 +159,13 @@ class Agent:
 			else:screen.blit(Img.images['sign2'],(x*32+U.vx,y*32+U.vy))
 	def draw_agent(self,screen,U,Font):
 		screen.blit(self.surface,(self.x*32+U.vx,self.y*32+U.vy))
-		screen.blit(Font.render(f'️{self.city_action}/{self.action}--{self.state}',True,(195,5,9),(255,255,255)),(self.x*32+U.vx,self.y*32+U.vy-10))
+		screen.blit(Font.render(f'️{int(self.hp)}{self.city_action}/{self.action}--{self.state}',True,(195,5,9),(255,255,255)),(self.x*32+U.vx,self.y*32+U.vy-10))
 	#--移动
 	def update_tile(self,W):
 		self.tile=W.World_map[self.x][self.y]
 		self.tile.Unit=self
-		self.tile.passability=None
 		if self.old_tile and self.tile!=self.old_tile:
 			self.old_tile.Unit=None
-			self.old_tile.passability=None
 		self.old_tile=self.tile
 	def move(self,target_x,target_y,grid):#移动行为
 		self.road=Method.bfs((self.x,self.y),(target_x,target_y),grid)

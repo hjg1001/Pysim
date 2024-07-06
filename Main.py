@@ -37,6 +37,7 @@ def Run():
 			agent.update(screen,U,Font2,W)
 		for city in W.City_list:
 			city.update(screen,U,Font3,W)
+		screen.blit(W.effect_surface,(U.vx,U.vy))
 		#工具UI
 		if U.tool_menu:menu.enable()
 		else:menu.disable()

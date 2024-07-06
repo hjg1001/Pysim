@@ -1,13 +1,18 @@
-import Img,Setting
-from random import choices
+import Img,random
 class Tree:
 	def __init__(self,x,y):
 		self.x,self.y=x,y
 		self.hp=[100,100]
+class Bush:
+	def __init__(self,x,y):
+		self.x,self.y=x,y
+		self.hp=[10,10]
+		self.food=random.randint(10,200)
 class Farm:
 	def __init__(self,x,y,city):
 		self.x,self.y=x,y
 		self.city=city
+		self.hp=[300,300]
 		self.build_progress=[0,100]
 		self.grow_progress=[0,100]
 		self.surface=Img.images['farm0']
@@ -26,8 +31,8 @@ class Farm:
 		screen.blit(self.surface,(self.x*32+U.vx,self.y*32+U.vy))
 	def grow(self):
 		if self.grow_progress[1]>self.grow_progress[0]:
-			self.grow_progress[0]+=0.3
+			self.grow_progress[0]+=0.5
 		else:
-			self.city.Resource['food']+=38
+			self.city.Resource['food']+=40
 			self.grow_progress[0]=0
 			self.build_progress[0]=0

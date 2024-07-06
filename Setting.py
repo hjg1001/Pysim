@@ -2,11 +2,14 @@
 screen_size=(720,1600)
 FPS=60
 Draw_Tile_Edges=True#绘制地块边框
+TerritoryAlpha=80#领土透明度
 Save_map_img=True
 #---世界设置
 World_size=[50,50]#长宽一致
-AgentNum=2#智能体总数
+AgentNum=7#智能体总数
 AgentDensity=0.02#智能体密度
 TreeProportion=0.1#树木占比
+BushProportion=0.02#灌木丛
 Seed=1145191#世界种子
 NoiseScale=50#缩放越大生成越平滑
+ExpandTile=30#一次扩张多少地块
