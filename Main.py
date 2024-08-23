@@ -1,68 +1,33 @@
-class UI:
+import pygame,World,Setting,Agent
+class EngineClass:
 	def __init__(self):
-		self.m_u,self.m_d,self.m_l,self.m_r,self.pause=False,False,False,False,True
-		self.tile_check=True
-		self.tool_menu=False
-		self.vx,self.vy=0,0
-		self.tool_rect=pygame.Rect(30,10,50,50)
-		self.dragging = False
-		self.tile_obj=None
-def Run():
-	menu=pygame_menu.Menu(
-        height=Setting.screen_size[1] * 0.3,
-        theme=pygame_menu.themes.THEME_ORANGE,
-        title='Tool menu',
-        width=Setting.screen_size[0] * 0.4
-    )
-	menu.add.button('Quit',lambda: Exit(U))
-	menu.add.selector('State',[('Pause', False), ('Run', True)],onchange=lambda x,y:pause(U))
-	clock=pygame.time.Clock()
-	while True:
-		screen.fill((0,0,0))
-		clock.tick(Setting.FPS)
-		fps=int(clock.get_fps())
-		events=pygame.event.get()
-		for event in events:
-			Key.control(U,event,W)
-			if event.type == pygame.QUIT:
-				break
-		Key.key_act(U)
-		#更新世界
-		screen.blit(W.surface,(U.vx,U.vy))
-		W.time_run()
-		for L in W.Building_list.values():
-			for building in L:
-				building.update(screen,U)
-		for agent in W.Agent_list:
-			agent.update(screen,U,Font2,W)
-		for city in W.City_list:
-			city.update(screen,U,Font3,W)
-		screen.blit(W.effect_surface,(U.vx,U.vy))
-		#工具UI
-		if U.tool_menu:menu.enable()
-		else:menu.disable()
-		if menu.is_enabled():
-			menu.update(events)
-			menu.draw(screen)
-		screen.blit(Img.images['tool'],(30,10))
-		#Debug
-		screen.blit(Font.render(f'FPS:{fps}',True,(255,5,9),(0,0,0)),(0,60))
-		screen.blit(Font.render(f'{W.Time[3]}年{W.Time[2]}月{W.Time[1]}天',True,(55,196,252),(255,255,255)),(0,100))
-		pygame.display.update()
-def pause(u):
-	u.pause=not u.pause
-def Exit(self):
-	self.tool_menu=False
-if __name__=='__main__':
-	import time
-	t0=time.time()
-	import pygame,World,Key,Setting,pygame_menu,Img
+		self.clock=pygame.time.Clock()
+		self.Font1=pygame.font.Font('NotoSerifCJK-Regular.ttc',20)
+		self.World=World.WorldClass()
+		Agent.Agent(15*20,21*20,self.World)
+		print(f'土地面积{self.World.Num[0]}/{self.World.Num[0]+self.World.Num[1]}')
+	def Run(self,screen):
+		while True:
+			self.clock.tick(Setting.FPS)
+			screen.fill((0,0,0))
+			#世界更新
+			for L in self.World.AreasList:
+				for Area in L:
+					if Area.x*10*20<Setting.ScreenSize[0] and Area.y*10*20<Setting.ScreenSize[1]:
+						screen.blit(pygame.transform.scale(Area.surface,(200*Setting.MapScale,200*Setting.MapScale)),(Area.x*10*20,Area.y*10*20))
+			for agent in self.World.AgentList:
+				agent.update(screen,self.World)
+			#渲染文字
+			screen.blit(self.Font1.render('FPS'+str(int(self.clock.get_fps())),False,(250,250,250),(1,100,1)),(1,10))
+			screen.blit(self.Font1.render('plan:'+str(self.World.AgentList[0].ActionList),False,(250,250,250),(1,100,1)),(1,50))
+			screen.blit(self.Font1.render('action:'+str(self.World.AgentList[0].action),False,(250,250,250),(1,100,1)),(1,90))
+			screen.blit(self.Font1.render('intention'+str(self.World.AgentList[0].intention.oldIntention),False,(250,250,250),(1,100,1)),(1,130))
+			screen.blit(self.Font1.render('debug'+str(self.World.AgentList[0].debug),False,(255,200,250),(1,100,1)),(1,170))
+			pygame.display.update()
+def main():
 	pygame.init()
-	screen=pygame.display.set_mode(Setting.screen_size)
-	W=World.World()
-	U=UI()
-	Font=pygame.font.Font('NotoSerifCJK-Regular.ttc',30)
-	Font2=pygame.font.Font('NotoSerifCJK-Regular.ttc',10)
-	Font3=pygame.font.Font('NotoSerifCJK-Regular.ttc',20)
-	print('此次初始化用时',time.time()-t0)
-	Run()
+	screen=pygame.display.set_mode((Setting.ScreenSize[0],Setting.ScreenSize[1]))
+	Engine=EngineClass()
+	Engine.Run(screen)
+if __name__=='__main__':
+	main()

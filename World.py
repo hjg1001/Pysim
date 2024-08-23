@@ -1,57 +1,72 @@
-import random,Tile,pygame,Setting,Img,Structure,Organ,Agent,perlin_noise
+import Img,Setting,random,pygame,Structure
+from Method import generate_noise
 import numpy as np
-class World:
+class Tile:
+	def __init__(self,x,y,Terrain,Pass):
+		self.x,self.y=x,y
+		self.Structure=None
+		self.Unit=[]
+		self.Terrain=Terrain
+		self.Funiture=None
+		self.Pass=Pass
+class Area:
+	def __init__(self,x,y):
+		self.water=0
+		self.tree=0
+		self.x,self.y=x,y
+		self.surface=pygame.Surface((10*20,10*20))
+class WorldClass:
 	def __init__(self):
-		self.Agent_list=[]
-		self.City_list=[]
-		self.Nation_list=[]
-		self.Building_list={'farm':[]}
-		#其他属性
-		self.Time=[0,0,0,0]#刻/天/月/年
-#-----生成地图
-		self.Noise=perlin_noise.PerlinNoise(3,Setting.Seed)
-		self.surface=pygame.Surface((Setting.World_size[0]*32,Setting.World_size[1]*32))
-		self.effect_surface=self.surface.copy()
-		self.effect_surface.set_alpha(Setting.TerritoryAlpha)
-		self.surface.fill((0,140,0))
-		generate  =  np.vectorize(self.generate)
-		self.World_map=generate(np.arange(Setting.World_size[0]),  np.arange(Setting.World_size[1]).reshape(-1,  1)).tolist()
-		#其他操作
-		if Setting.Draw_Tile_Edges:
-			for x in range(0,Setting.World_size[0]):pygame.draw.line(self.surface,(0,0,0),(x*32,0),(x*32,Setting.World_size[0]*32))
-			for y in range(0,Setting.World_size[1]):pygame.draw.line(self.surface,(0,0,0),(0,y*32),(Setting.World_size[1]*32,y*32))
-		if Setting.Save_map_img:pygame.image.save(self.surface,'W.png')
-		#debug
-		for _ in range(Setting.AgentNum):
-			T=self.World_map[1][19]
-			T.Unit=Agent.Agent(2,19)
-			self.Agent_list.append(T.Unit)
-	def generate(self,y,x):#生成规则
-			if self.Noise.noise([x/Setting.NoiseScale,y/Setting.NoiseScale])>0:
-				T=Tile.Tile(x,y,'grass',0)
-			else:
-				T=Tile.Tile(x,y,'water',0)
-				T.passability=None
-				pygame.draw.rect(self.surface,(80,107,186),(x*32,y*32,32,32))
-			if T.Terrain!='water' and random.random()<Setting.TreeProportion:
-				T.Structure=Structure.Tree(x,y)
-				T.passability=None
-				self.surface.blit(Img.images['tree'],(x*32,y*32))
-			elif T.Terrain!='water' and random.random()<Setting.BushProportion:
-				T.Structure=Structure.Bush(x,y)
-				self.surface.blit(Img.images['bush'],(x*32,y*32))
-#			elif T.Terrain!='water' and Setting.AgentDensity>random.random() and Setting.AgentNum>len(self.Agent_list):
-#				T.Unit=Agent.Agent(x,y)
-#				self.Agent_list.append(T.Unit)
-			return T
-	def time_run(self):
-		self.Time[0]+=30
-		if self.Time[0]>500:
-			self.Time[0]=0
-			self.Time[1]+=1
-		if self.Time[1]>31:
-			self.Time[1]=0
-			self.Time[2]+=1
-		if self.Time[2]>12:
-			self.Time[2]=0
-			self.Time[3]+=1
+		self.AreasList=[]#标准[x][y]
+		self.AgentList=[]
+		#---生成地图
+		self.Num=[0,0]
+		self.Noise=generate_noise([Setting.WorldSize[0],Setting.WorldSize[1]],[2,2])#平滑噪声
+		self.Noise2=generate_noise([Setting.WorldSize[0],Setting.WorldSize[1]],[2,5])#碎片噪声1
+		self.Noise3=generate_noise([Setting.WorldSize[0],Setting.WorldSize[1]],[5,2])#碎片噪声2
+		self.Noise4=generate_noise([Setting.WorldSize[0],Setting.WorldSize[1]],[5,5])#自然噪声
+		generate  =  np.vectorize(self.generate) 
+		self.WorldMap=generate(np.arange(Setting.WorldSize[0]),  np.arange(Setting.WorldSize[1]).reshape(-1,  1)).tolist()
+		#---划线
+		if Setting.DrawTile or Setting.DrawArea:
+			for l in self.AreasList:
+				for a in l:
+					if Setting.DrawArea:pygame.draw.rect(a.surface,(255,0,0),(0,0,10*20,10*20),1)
+					if Setting.DrawTile:
+						for Y in range(10):pygame.draw.line(a.surface,(0,0,0),(0,Y*20),(10*20,Y*20))
+						for X in range(10):pygame.draw.line(a.surface,(0,0,0),(X*20,0),(X*20,10*20))
+					#同时生成区域内容
+	def generate(self,y,x):
+		#添加区块
+		AreaX=x//10
+		AreaY=y//10
+		if len(self.AreasList)<=AreaX:
+			self.AreasList.append([])
+		if len(self.AreasList[AreaX])<=AreaY:
+			self.AreasList[AreaX].append(Area(AreaX,AreaY))
+		#区块中添加地块
+		NoiseValue=self.Noise[x][y]+self.Noise2[x][y]*Setting.WorldNoise[0]+self.Noise3[x][y]*Setting.WorldNoise[1]
+		if NoiseValue>228:
+			T=Tile(x,y,'grass',True)
+			self.Num[0]+=1
+			self.AreasList[AreaX][AreaY].surface.blit(Img.images['grass'],((x-AreaX*10)*20,(y-AreaY*10)*20),(random.randint(0,20),0,20,20))
+		elif 220<NoiseValue<=228:
+			T=Tile(x,y,'sand',True)
+			self.Num[0]+=1
+			self.AreasList[AreaX][AreaY].surface.blit(Img.images['sand'],((x-AreaX*10)*20,(y-AreaY*10)*20),(random.randint(0,20),0,20,20))
+		else:
+			self.AreasList[AreaX][AreaY].water+=1
+			T=Tile(x,y,'water',False)
+			self.Num[1]+=1
+			self.AreasList[AreaX][AreaY].surface.blit(Img.images['water'],((x-AreaX*10)*20,(y-AreaY*10)*20),(random.randint(0,20),0,20,20))
+		#生成资源
+		if 180>self.Noise4[x][y]>100 and random.random()>0.6 and T.Terrain=='grass':
+			T.Structure=Structure.Tree(x,y)
+			T.Pass=False
+			self.AreasList[AreaX][AreaY].tree+=1
+			self.AreasList[AreaX][AreaY].surface.blit(Img.images['tree'],((x-AreaX*10)*20,(y-AreaY*10)*20))
+		elif 100>self.Noise4[x][y]>80 and random.random()>0.8 and T.Terrain=='grass':
+			T.Structure=Structure.Bush(x,y)
+			T.Pass=True
+			self.AreasList[AreaX][AreaY].surface.blit(Img.images['bush'],((x-AreaX*10)*20,(y-AreaY*10)*20))
+		return T

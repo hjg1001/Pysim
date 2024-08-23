@@ -1,192 +1,126 @@
-import Img,random,Method,Structure,Setting,Organ,pygame
-from collections import deque
+import Img,Method,math,pygame,Setting,random,agentCore,Items
 class Agent:
-	def __init__(self,x,y):
-		self.surface=Img.images['agent']
-		self.x,self.y=x,y#格点坐标
-		self.old_tile=None
-		self.tile=None
-		self.move_time=random.randint(10,19)#移动所需时间
-		self.move_timer=0#移动计时
-		self.road=[]
-		self.target_x,self.target_y=None,None
-		self.state=None
-		self.action=None
-		self.city_action=None#分配到的行为
-		self.Job=None
-		self.Nation=None
-		self.City=None
-		self.work_building=None
-		#基本属性
-		self.strength=random.randint(10,100)#力量
-		self.intelligence=random.randint(0,100)#智力
-		self.agility=random.randint(0,100)#敏捷
-		self.max_hp=random.randint(50,250)#最大生命值
+	def __init__(self,x,y,World):
+		World.AgentList.append(self)
+		self.x,self.y=x,y#屏幕坐标
+		self.FloatX,self.FloatY=x,y
+		self.target_x,self.target_y=None,None#屏幕坐标
+		self.road=[]#格点坐标
+		self.NewTile,self.OldTile=None,None
+		self.Frame,self.FrameTime=0,0
+		self.action,self.state=None,None
+		self.AnimSpeed=3
+		self.process=[0,0]
+		self.AnimList={'None':[1,Img.images['agent_None']],'Move':[1,Img.images['agent_Move']]}
+		self.MoveTime=[0,2]
+		self.Flip=False
+		self.Goal=None
+		self.intention=agentCore.Intention()
+		self.ActionList=[]
+		self.ActionList_close=[]
+		self.Inventory=[]
+		self.debug=''
+		#属性
+		self.HP=[random.randint(100,150)]
+		self.HP.append(self.HP[0])
+		self.Speed=random.uniform(0.5,1.5)
+		self.Strength=random.randint(0,100)#力量
+		self.Intelligence=random.randint(0,100)#智力
+		self.Agility=random.randint(0,100)#敏捷
+		self.Perceptivity=random.randint(0,100)#感知
 		#其他属性
-		self.hp=self.max_hp
 		self.satiety=100#饱食度
-	def update(self,screen,U,font,W):
-		if not U.pause:
-			self.update_tile(W)
-			#更新行为
-			if not self.action:
-				#建立城市/国家
-				if not self.Nation and self.get_tile_rect(self.x,self.y,4,W,'City',None):
-					self.set_nation(W)
-				#寻找最近城市加入
-				elif W.Nation_list and not self.Nation:
-					CityTile=random.choice(random.choice(W.City_list).CityTile)
-					if CityTile.passability==0:
-						self.move(CityTile.x,CityTile.y,W.World_map)
-						if self.road:self.action='search_for_city'
-				#获取工作
-				if self.City and self.City.ActionState:
-					for action in self.City.ActionList:
-						if self.City.ActionList[action][1]>self.City.ActionList[action][0]:
-							self.city_action=action
-							self.City.ActionList[action][0]+=1
-							break
-				elif not self.city_action and not self.action and not self.state and self.City and random.randint(0,10000)>9990:
-					T=random.choice(self.City.CityTile)
-					self.move(T.x,T.y,W.World_map)#否则闲逛
-			#更新行为至城市
-			if self.City and self.action and self.City.ActionState==0:
-				if self.city_action in self.City.ActionList.keys():
-					self.City.ActionList[self.city_action][0]+=1
-			#更新状态
-			if self.state=='move':self.move_state()
-			elif self.action=='search_for_city':#加入城市状态
-				if self.tile.City:
-					self.Nation=self.tile.City.Nation
-					self.tile.City.AgentList.append(self)
-					self.action=None
-					self.City=self.tile.City
-			elif self.city_action=='farm' and not self.action:#细分种田
-				for farm in self.City.FarmList:
-					if not self.City.FarmList[farm][3] or((self.City.FarmList[farm][3].x,self.City.FarmList[farm][3].y)!=(self.City.FarmList[farm][1],self.City.FarmList[farm][2])):
-						if not self.City.FarmList[farm][3] or not self.City.FarmList[farm][3].road or (self.City.FarmList[farm][3].road[len(self.City.FarmList[farm][3].road)-1][0],self.City.FarmList[farm][3].road[len(self.City.FarmList[farm][3].road)-1][1])!=(self.City.FarmList[farm][1],self.City.FarmList[farm][2]):
-							self.work_building=farm
-							self.move(self.City.FarmList[farm][1],self.City.FarmList[farm][2],W.World_map)
-							self.action=self.City.FarmList[farm][0]
-							self.City.FarmList[farm][3]=self
-							break
-				if not self.action:self.city_action=None
-			elif self.city_action=='pick' and not self.action:#采集
-				T=random.choice(self.City.CityTile)
-				if type(T.Structure).__name__=='Bush':
-					self.move(T.x,T.y,W.World_map)
-					if self.state=='move':
-						self.action='pick_bush'
-				if not self.action:self.city_action=None
-			#细化行为下的状态
-			if self.state=='move':pass
-			elif self.action=='set_farm':#建新田
-				W.World_map[self.x][self.y].Structure=self.work_building
-				W.Building_list['farm'].append(self.work_building)
-				self.City.BuildingList['farm'][0].append(self.work_building)
-				self.action=None
-				if self.work_building in list(self.City.FarmList.keys()):self.City.FarmList.pop(self.work_building)
-				self.work_building=None
-				self.city_action=None
-			elif self.action=='continue_farm':#耕田
-				self.work_building.build_progress[0]+=self.strength*0.01
-				if self.work_building.build_progress[0]>self.work_building.build_progress[1]:
-					self.action=None
-					self.city_action=None
-					if self.work_building in list(self.City.FarmList.keys()):self.City.FarmList.pop(self.work_building)
-			elif self.action=='pick_bush':
-				W.World_map[self.x][self.y].Structure.food-=1
-				self.City.Resource['food']+=1
-				if W.World_map[self.x][self.y].Structure.food<0:
-					self.city_action=None
-					self.action=None
-					W.World_map[self.x][self.y].Structure=None
-					pygame.draw.rect(W.surface,(0,140,0),(self.x*32+1,self.y*32+1,31,31))
-			#更新自然状态
-			if self.satiety>0:self.satiety-=0.06
-			else:self.hp-=0.08
-			if self.satiety<40 and self.City:
-				if self.City.Resource['food']<40:
-					self.satiety+=self.City.Resource['food']
-					self.City.Resource['food']=0
-				else:
-					self.City.Resource['food']-=40
-					self.satiety+=40
-			if self.hp<0:self.die(W)
-		#绘制
-		self.draw_agent(screen,U,font)
-		if self.road:self.draw_road(screen,U)
-	#--方法
-	def get_tile_rect(self,x,y,radius,W,info,need_info):#正方形全面检索(左至右)
-		min_x=max(0,x-radius)
-		max_x=min(Setting.World_size[0]-1,x+radius)
-		min_y=max(0,y-radius)
-		max_y=min(Setting.World_size[1]-1,y+radius)
-		TileNum=[0,(max_x-min_x+1)*(max_y-min_y+1)]
-		for nx in range(min_x,max_x+1):
-			for ny in range(min_y,max_y+1):
-				if getattr(W.World_map[nx][ny],info)==need_info:
-					TileNum[0]+=1
-		return TileNum[1]<=TileNum[0]
-	#--死亡
-	def die(self,W):
-		if self.City:self.City.AgentList.remove(self)
-		W.World_map[self.x][self.y].Unit=None
-		W.Agent_list.remove(self)
-		del self
-	#--建立组织
-	def set_nation(self,W):
-		Nation=Organ.Nation(W.Time)
-		W.Nation_list.append(Nation)
-		self.set_city(W,Nation)
-	def set_city(self,W,Nation):
-		City=Organ.City(W.Time,Nation,self.x,self.y)
-		CityTileSurface=pygame.Surface((32,32))
-		CityTileSurface.fill(Nation.Color)
-		radius=4
-		for nx in range(max(0,self.x-radius),min(Setting.World_size[0]-1,self.x+radius)+1):
-			for ny in range(max(0,self.y-radius),min(Setting.World_size[1]-1,self.y+radius)+1):
-				setattr(W.World_map[nx][ny],'City',City)
-				W.effect_surface.blit(CityTileSurface,(nx*32,ny*32))
-				City.CityTile.append(W.World_map[nx][ny])
-				City.VisitQueue.append(W.World_map[nx][ny])
-		W.City_list.append(City)
-		Nation.City_list.append(City)
-	#--绘制
-	def draw_road(self,screen,U):#绘制道路
-		for x,y in self.road:
-			if not self.action:screen.blit(Img.images['sign'],(x*32+U.vx,y*32+U.vy))
-			else:screen.blit(Img.images['sign2'],(x*32+U.vx,y*32+U.vy))
-	def draw_agent(self,screen,U,Font):
-		screen.blit(self.surface,(self.x*32+U.vx,self.y*32+U.vy))
-		screen.blit(Font.render(f'️{int(self.hp)}{self.city_action}/{self.action}--{self.state}',True,(195,5,9),(255,255,255)),(self.x*32+U.vx,self.y*32+U.vy-10))
-	#--移动
-	def update_tile(self,W):
-		self.tile=W.World_map[self.x][self.y]
-		self.tile.Unit=self
-		if self.old_tile and self.tile!=self.old_tile:
-			self.old_tile.Unit=None
-		self.old_tile=self.tile
-	def move(self,target_x,target_y,grid):#移动行为
-		self.road=Method.bfs((self.x,self.y),(target_x,target_y),grid)
+		self.vision=40#视野
+	def update(self,screen,World):
+		self.update_tile(World)
+	#属性更新
+		self.satiety-=0.05
+		if self.satiety>1:
+			self.satiety-=0.01
+		else:
+			self.satiety=1
+			self.HP[0]-=0.01
+	#---主要更新
+		self.intention.update(self)
+		#行为更新
+		if not self.action and self.ActionList:
+			for act in self.ActionList:
+				if act not in self.ActionList_close:
+					self.action=act
+					break
+			if not self.action:#计划结束,为每个行动增加优先值
+				for act in self.ActionList:
+					if act.preference<0.9:act.preference+=random.uniform(0.01,0.03)
+				self.ActionList,self.ActionList_close,self.Goal=[],[],None
+		if self.action:self.action.run(self,World)
+		#移动状态更新
+		if self.state=='Move':
+			self.MoveTime[0]+=2
+		if self.MoveTime[0]>self.MoveTime[1]:
+			self.MoveTime[0]=0
+			self.moveState()
+			self.x,self.y=int(self.FloatX),int(self.FloatY)
+			self.AnimSpeed=self.Speed*1.4
+		else:
+			self.AnimSpeed=3
+	#---绘制更新
+		self.draw(screen)
+	def update_tile(self,World):
+		if not self.OldTile:self.OldTile=World.WorldMap[self.x//20][self.y//20]
+		self.NewTile=World.WorldMap[self.x//20][self.y//20]
+		if self.OldTile!=self.NewTile:
+			self.OldTile.Unit.remove(self)
+			self.OldTile=self.NewTile
+		else:
+			World.WorldMap[self.x//20][self.y//20].Unit.append(self)
+	def draw(self,screen):#绘制
+		self.animUpdate()
+		Surface=self.AnimList[str(self.state)][1]
+		if self.target_x and self.target_x<self.x:
+			self.Flip=True
+		if self.Flip:Surface=pygame.transform.flip(Surface,True,False)
+		screen.blit(pygame.transform.scale(Surface,(self.AnimList[str(self.state)][1].get_width()*Setting.MapScale,self.AnimList[str(self.state)][1].get_height()*Setting.MapScale)),(self.x,self.y),(self.Frame*20*Setting.MapScale,0,20*Setting.MapScale,20*Setting.MapScale))
 		if self.road:
-			self.target_x,self.target_y=target_x,target_y
-			self.state='move'
-	def move_state(self):#移动状态
-		self.move_timer+=1*(1+self.agility/100)
-		dx=self.x-self.target_x
-		dy=self.y-self.target_y
-		if dx==0 and dy==0:
+			for num in range(len(self.road)):
+				if len(self.road)>1 and num+1<len(self.road):
+					pygame.draw.line(screen,(255,255,180),(self.road[num][0]*20,self.road[num][1]*20),(self.road[num+1][0]*20,self.road[num+1][1]*20))
+				else:
+					pygame.draw.line(screen,(255,255,180),(self.x,self.y),(self.road[0][0]*20,self.road[0][1]*20))
+		#进度条
+		if self.process[1]>self.process[0]:
+			screen.blit(Img.images['process_1'],(self.x-2,self.y-5))
+			screen.blit(Img.images['process_0'],(self.x-2,self.y-5),(0,0,int(self.process[0]/self.process[1]*30),2))
+	def animUpdate(self):
+		self.FrameTime+=self.AnimSpeed
+		if self.FrameTime>60:
+			self.FrameTime=0
+			if self.Frame<self.AnimList[str(self.state)][0]:
+				self.Frame+=1
+			else:
+				self.Frame=0
+	#移动
+	def move(self,targetx,targety,World):
+		road=Method.bfs((self.x//20,self.y//20),(targetx,targety),World.WorldMap)
+		if road:
+			self.state='Move'
+			self.road=road
+	def moveState(self):
+		if self.road and (not self.target_x or (self.FloatX==self.target_x and self.FloatY==self.target_y)):
+			T=self.road.pop(0)
+			self.target_x,self.target_y=T[0]*20,T[1]*20
+		elif not self.road:
 			self.state=None
 			self.target_x,self.target_y=None,None
-			self.move_timer=0
-			self.road=[]
-		elif self.move_timer>=self.move_time:
-			if self.road:
-				self.x,self.y=self.road[0]
-				self.road.remove(self.road[0])
-				self.move_timer=0
+		if self.state=='Move':
+			dx = self.target_x - self.FloatX
+			dy = self.target_y - self.FloatY
+			distance = math.sqrt(dx**2 + dy**2)
+			if distance <= self.Speed:
+				new_x = self.target_x
+				new_y = self.target_y
 			else:
-				self.state=None
-				self.target_x,self.target_y=None,None
-				self.move_timer=0
+				ratio = self.Speed / distance
+				new_x = self.FloatX + dx * ratio
+				new_y = self.FloatY + dy * ratio
+			self.debug=(new_x,new_y),(self.FloatX,self.FloatY)
+			self.FloatX,self.FloatY=new_x,new_y

@@ -1,15 +1,10 @@
-#---程序设置
-screen_size=(720,1600)
+ScreenSize=[720,1600]
+#区块大小10*10
+size=[15,15]#世界大小 即xy轴上的区块数目
+WorldSize=[10*size[0],10*size[1]]
+WorldNoise=[0.5,0.5]#碎片化在x y上的作用占比
 FPS=60
-Draw_Tile_Edges=True#绘制地块边框
-TerritoryAlpha=80#领土透明度
-Save_map_img=True
-#---世界设置
-World_size=[50,50]#长宽一致
-AgentNum=7#智能体总数
-AgentDensity=0.02#智能体密度
-TreeProportion=0.1#树木占比
-BushProportion=0.02#灌木丛
-Seed=1145191#世界种子
-NoiseScale=50#缩放越大生成越平滑
-ExpandTile=30#一次扩张多少地块
+#绘制边框
+DrawArea=True#绘制区块
+DrawTile=True#绘制地块
+MapScale=1
